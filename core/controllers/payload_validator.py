@@ -88,15 +88,24 @@ def validate_arguments_against_schema(
     errors = []
     # Dictionary to hold normalized values of arguments after validation.
     normalized_values = {}
+    # print(handler_args_schemas.items())
     for arg_key, arg_schema in handler_args_schemas.items():
+        both = False
+        print(arg_key)
+        print(arg_schema)
+        print("Handler Args")
+        print(handler_args)
         if arg_key not in handler_args or handler_args[arg_key] is None:
             if 'default_value' in arg_schema:
+                print("Default Entered")
                 if arg_schema['default_value'] is None:
                     # Skip validation because the argument is optional.
                     continue
-
-                if arg_schema['default_value'] is not None:
+                
+                else:
                     handler_args[arg_key] = arg_schema['default_value']
+                    print("Entered First If")
+                    both = True
             else:
                 errors.append('Missing key in handler args: %s.' % arg_key)
                 continue
@@ -110,6 +119,8 @@ def validate_arguments_against_schema(
         ):
             handler_args[arg_key] = (
                 convert_string_to_bool(handler_args[arg_key]))
+            print("Entered Second If")
+            print(both)
 
         try:
             normalized_value = schema_utils.normalize_against_schema(
