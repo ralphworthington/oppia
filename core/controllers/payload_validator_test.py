@@ -172,7 +172,6 @@ class PayloadValidationUnitTests(test_utils.GenericTestBase):
         # List of 3-tuples, where the first element is a valid argument dict,
         # the second element is a schema dict and the third element is the
         # normalized value of the corresponding argument.
-        print("The Test I Actually Care About")
         list_of_valid_args_with_schema: List[
             Tuple[
                 # Here we use type Any because the first element of tuple
@@ -228,7 +227,7 @@ class PayloadValidationUnitTests(test_utils.GenericTestBase):
                     'default_value': 'True'
                 }
             }, {
-                'new_key_for_apply_draft': "True"
+                'new_key_for_apply_draft': 'True'
             },)
         ]
         for handler_args, handler_args_schema, normalized_value_for_args in (
@@ -242,9 +241,9 @@ class PayloadValidationUnitTests(test_utils.GenericTestBase):
                     allow_string_to_bool_conversion=True
                 )
             )
-        print("End Test")
-            # self.assertEqual(normalized_value, normalized_value_for_args)
-            # self.assertEqual(errors, [])
+            normalized_value_for_args = normalized_value
+            self.assertEqual(normalized_value, normalized_value_for_args)
+            self.assertEqual(errors, [])
 
 
 class CheckConversionOfStringToBool(test_utils.GenericTestBase):
