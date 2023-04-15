@@ -1,3 +1,5 @@
+# coding: utf-8
+
 # Copyright 2021 The Oppia Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,282 +14,138 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for various errors raised by validate method of payload validator."""
+"""Validates handler args against its schema by calling schema utils.
+Also contains a list of handler class names which does not contain the schema.
+"""
 
 from __future__ import annotations
 
-from core.controllers import payload_validator
-from core.tests import test_utils
+from core import schema_utils
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 
-class PayloadValidationUnitTests(test_utils.GenericTestBase):
+# Here we use type Any because the sub-classes of BaseHandler can
+# contain different schemas with different types of values, like str,
+# complex dicts, etc.
+def get_schema_type(arg_schema: Dict[str, Any]) -> str:
+    """Returns the schema type for an argument.
 
-    def test_invalid_args_raises_exceptions(self) -> None:
-        # List of 3-tuples, where the first element is an invalid argument dict,
-        # the second element is a schema dict and the third element
-        # is a list of errors.
+    Args:
+        arg_schema: dict(str, *). Schema for an argument.
 
-        list_of_invalid_args_with_schema_and_errors: List[
-            Tuple[
-                # Here we use type Any because the first element of tuple
-                # represents the argument dict and those argument dicts
-                # can have various types of values.
-                Dict[str, Any],
-                # Here we use type Any because the second element of tuple
-                # represents the schema dict and those schema dicts
-                # can have different types of values.
-                Dict[str, Any],
-                List[str]
-            ]
-        ] = [
-            ({
-                'exploration_id': 2
-            }, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    }
-                }
-            }, [
-                'Schema validation for \'exploration_id\' failed: '
-                'Expected string, received 2']),
-            ({
-                'version': 'random_string'
-            }, {
-                'version': {
-                    'schema': {
-                        'type': 'int'
-                    }
-                }
-            }, [
-                'Schema validation for \'version\' failed: '
-                'Could not convert str to int: random_string']),
-            ({
-                'exploration_id': 'any_exp_id'
-            }, {}, [
-                'Found extra args: [\'exploration_id\'].']),
-            ({}, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    }
-                }
-            }, [
-                'Missing key in handler args: exploration_id.'])
-        ]
-        for handler_args, handler_args_schema, error_msg in (
-                list_of_invalid_args_with_schema_and_errors):
-            normalized_value, errors = (
-                payload_validator.validate_arguments_against_schema(
-                    handler_args,
-                    handler_args_schema,
-                    allowed_extra_args=False,
-                    allow_string_to_bool_conversion=False
-                )
-            )
+    Returns:
+        str. Returns schema type by extracting it from schema.
+    """
+    schema_type: str = arg_schema['schema']['type']
+    return schema_type
 
-            self.assertEqual(normalized_value, {})
-            self.assertEqual(error_msg, errors)
 
-    def test_valid_args_do_not_raises_exception(self) -> None:
-        # List of 3-tuples, where the first element is a valid argument dict,
-        # the second element is a schema dict and the third element is the
-        # normalized value of the corresponding argument.
-        list_of_valid_args_with_schema: List[
-            Tuple[
-                # Here we use type Any because the first element of tuple
-                # represents the argument dict and those argument dicts
-                # can have various types of values.
-                Dict[str, Any],
-                # Here we use type Any because the second element of tuple
-                # represents the schema dict and those schema dicts
-                # can have different types of values.
-                Dict[str, Any],
-                # Here we use type Any because the third element of tuple
-                # represents the normalized value of the corresponding
-                # argument.
-                Dict[str, Any]
-            ]
-        ] = [
-            ({}, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    },
-                    'default_value': None
-                }
-            }, {}),
-            ({}, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    },
-                    'default_value': 'default_exp_id'
-                }
-            }, {
-                'exploration_id': 'default_exp_id'
-            }),
-            ({
-                'exploration_id': 'any_exp_id'
-            }, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    }
-                }
-            }, {
-                'exploration_id': 'any_exp_id'
-            }),
-            ({
-                'apply_draft': 'true'
-            }, {
-                'apply_draft': {
-                    'schema': {
-                        'type': 'bool',
-                        'new_key_for_argument': 'new_key_for_apply_draft'
-                    }
-                }
-            }, {
-                'new_key_for_apply_draft': True
-            })
-        ]
-        for handler_args, handler_args_schema, normalized_value_for_args in (
-            list_of_valid_args_with_schema
+# Here we use type Any because the sub-classes of BaseHandler can
+# contain different schemas with different types of values, like str,
+# complex dicts, etc.
+def get_corresponding_key_for_object(arg_schema: Dict[str, Any]) -> str:
+    """Returns the new key for an argument from its schema.
+
+    Args:
+        arg_schema: dict(str, *). Schema for an argument.
+
+    Returns:
+        str. The new argument name.
+    """
+    new_key_for_argument: str = arg_schema['schema']['new_key_for_argument']
+    return new_key_for_argument
+
+
+# Here we use type Any because the argument 'handler_args' is a dictionary
+# representation of arguments that need to be validated and these arguments
+# can be of any type, and the argument 'handler_args_schemas' is also annotated
+# with Any type because this argument can accept schemas of the handler and
+# those schemas can be of different kinds of dictionaries. The return type also
+# uses Any because this method returns the normalized values of arguments.
+def validate_arguments_against_schema(
+    handler_args: Dict[str, Any],
+    handler_args_schemas: Dict[str, Any],
+    allowed_extra_args: bool,
+    allow_string_to_bool_conversion: bool = False
+) -> Tuple[Dict[str, Any], List[str]]:
+    """Calls schema utils for normalization of object against its schema
+    and collects all the errors.
+
+    Args:
+        handler_args: Dict(str, *). Object for normalization.
+        handler_args_schemas: dict. Schema for args.
+        allowed_extra_args: bool. Whether extra args are allowed in handler.
+        allow_string_to_bool_conversion: bool. Whether to allow string to
+            boolean conversion.
+
+    Returns:
+        *. A two tuple, where the first element represents the normalized value
+        in dict format and the second element represents the lists of errors
+        after validation.
+    """
+    # Collect all errors and present them at once.
+    errors = []
+    # Dictionary to hold normalized values of arguments after validation.
+    normalized_values = {}
+    for arg_key, arg_schema in handler_args_schemas.items():
+        if arg_key not in handler_args or handler_args[arg_key] is None:
+            if 'default_value' in arg_schema:
+                if arg_schema['default_value'] is None:
+                    continue
+                handler_args[arg_key] = arg_schema['default_value']
+            else:
+                errors.append('Missing key in handler args: %s.' % arg_key)
+                continue
+
+        # Below normalization is for arguments which are expected to be boolean
+        # but from API request they are received as string type.
+        if (
+                allow_string_to_bool_conversion and
+                get_schema_type(arg_schema) == schema_utils.SCHEMA_TYPE_BOOL
+                and isinstance(handler_args[arg_key], str)
         ):
-            normalized_value, errors = (
-                payload_validator.validate_arguments_against_schema(
-                    handler_args,
-                    handler_args_schema,
-                    allowed_extra_args=False,
-                    allow_string_to_bool_conversion=True
-                )
-            )
+            handler_args[arg_key] = (
+                convert_string_to_bool(handler_args[arg_key]))
 
-            self.assertEqual(normalized_value, normalized_value_for_args)
-            self.assertEqual(errors, [])
+        try:
+            normalized_value = schema_utils.normalize_against_schema(
+                handler_args[arg_key], arg_schema['schema'])
 
-    def test_valid(self) -> None:
-        # List of 3-tuples, where the first element is a valid argument dict,
-        # the second element is a schema dict and the third element is the
-        # normalized value of the corresponding argument.
-        list_of_valid_args_with_schema: List[
-            Tuple[
-                # Here we use type Any because the first element of tuple
-                # represents the argument dict and those argument dicts
-                # can have various types of values.
-                Dict[str, Any],
-                # Here we use type Any because the second element of tuple
-                # represents the schema dict and those schema dicts
-                # can have different types of values.
-                Dict[str, Any],
-                # Here we use type Any because the third element of tuple
-                # represents the normalized value of the corresponding
-                # argument.
-                Dict[str, Any]
-            ]
-        ] = [
-            ({}, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    },
-                    'default_value': None
-                }
-            }, {}),
-            ({}, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    },
-                    'default_value': 'default_exp_id'
-                }
-            }, {
-                'exploration_id': 'default_exp_id'
-            }),
-            ({
-                'exploration_id': 'any_exp_id'
-            }, {
-                'exploration_id': {
-                    'schema': {
-                        'type': 'basestring'
-                    }
-                }
-            }, {
-                'exploration_id': 'any_exp_id'
-            }),
-            ({
-            }, {
-                'apply_draft': {
-                    'schema': {
-                        'type': 'bool',
-                        'new_key_for_argument': 'new_key_for_apply_draft'
-                    },
-                    'default_value': 'True'
-                }
-            }, {
-                'new_key_for_apply_draft': 'True'
-            },)
-        ]
-        for handler_args, handler_args_schema, normalized_value_for_args in (
-            list_of_valid_args_with_schema
-        ):
-            normalized_value, errors = (
-                payload_validator.validate_arguments_against_schema(
-                    handler_args,
-                    handler_args_schema,
-                    allowed_extra_args=False,
-                    allow_string_to_bool_conversion=True
-                )
-            )
-            normalized_value_for_args = normalized_value
-            self.assertEqual(normalized_value, normalized_value_for_args)
-            self.assertEqual(errors, [])
+            # Modification of argument name if new_key_for_argument
+            # field is present in the schema.
+            if 'new_key_for_argument' in arg_schema['schema']:
+                arg_key = get_corresponding_key_for_object(arg_schema)
+            normalized_values[arg_key] = normalized_value
+        except Exception as e:
+            errors.append(
+                'Schema validation for \'%s\' failed: %s' % (arg_key, e))
+
+    extra_args = set(handler_args.keys()) - set(handler_args_schemas.keys())
+
+    if not allowed_extra_args and extra_args:
+        errors.append('Found extra args: %s.' % (list(extra_args)))
+
+    return normalized_values, errors
 
 
-class CheckConversionOfStringToBool(test_utils.GenericTestBase):
-    """Test class to check behaviour of convert_string_to_bool method."""
+def convert_string_to_bool(param: str) -> Union[bool, str]:
+    """Converts a request param of type string into expected bool type.
 
-    def test_convert_string_to_bool(self) -> None:
-        """Test case to check behaviour of convert_string_to_bool method."""
-        self.assertTrue(
-            payload_validator.convert_string_to_bool('true'))
-        self.assertFalse(
-            payload_validator.convert_string_to_bool('false'))
-        self.assertEqual(
-            payload_validator.convert_string_to_bool('any_other_value'),
-            'any_other_value'
-        )
+    Args:
+        param: str. The params which needs normalization.
 
+    Returns:
+        Union[bool, str]. Returns a boolean value if the param is either a
+        'true' or 'false' string literal, and returns string value otherwise.
+    """
+    case_insensitive_param = param.lower()
 
-class CheckGetCorrespondingKeyForObjectMethod(test_utils.GenericTestBase):
-    """Test class to check behaviour of get_corresponding_key_for_object
-    method."""
-
-    def test_get_new_arg_key_from_schema(self) -> None:
-        """Test case to check behaviour of new arg key name."""
-        sample_arg_schema = {
-            'schema': {
-                'new_key_for_argument': 'sample_new_arg_name'
-            }
-        }
-        new_key_name = payload_validator.get_corresponding_key_for_object(
-            sample_arg_schema)
-
-        self.assertEqual(new_key_name, 'sample_new_arg_name')
-
-
-class CheckGetSchemaTypeMethod(test_utils.GenericTestBase):
-    """Test class to check behaviour of get_schema_type method."""
-
-    def test_get_schema_type_from_schema(self) -> None:
-        """Test case to check behaviour of get_schema_type method."""
-        sample_arg_schema = {
-            'schema': {
-                'type': 'bool'
-            }
-        }
-        schema_type = payload_validator.get_schema_type(sample_arg_schema)
-
-        self.assertEqual(schema_type, 'bool')
+    if case_insensitive_param == 'true':
+        return True
+    elif case_insensitive_param == 'false':
+        return False
+    else:
+        # String values other than booleans should be returned as it is, so that
+        # schema validation will raise exceptions appropriately.
+        return param
